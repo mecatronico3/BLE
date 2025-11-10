@@ -53,14 +53,23 @@ static const struct bt_le_adv_param adv_params = {
 static uint8_t value = 0;
 static struct bt_conn *current_conn;
 
+// Callback cuando se hace el read, se llama en el gatt service
+static ssize_t read_button_value(struct bt_conn *conn, const struct bt_gatt_attr *attr,
+                                 void *buf, uint16_t len, uint16_t offset)
+{
+    const uint8_t *value_ptr = attr->user_data; 
+    
+    return bt_gatt_attr_read(conn, attr, buf, len, offset, value_ptr, sizeof(*value_ptr));
+}
 
+/*
 // Habiltación de la notificación
 // Pregunta(me) que hace el '?'
 static void button_ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)
 {
     LOG_INF("Notificationes %s", value == BT_GATT_CCC_NOTIFY ? "habilitadas" : "deshabilitadas");
 }
-
+*/
 
 // GATT 
 BT_GATT_SERVICE_DEFINE(button_svc,
@@ -69,17 +78,26 @@ BT_GATT_SERVICE_DEFINE(button_svc,
         0xf0,0xde,0xbc,0x9a,0x78,0x56,0x34,0x12, //  8 bytes inferiores
         0xf0,0xde,0xbc,0x9a,0x78,0x56,0x34,0x12)), // 8 bytes superiores
         
-    BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(
+   /* BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(
         // Este UUID es ligeramente distinto, en lugar de f0 comienza con f1
         // Recuerda que esta espejeado, asi que en realidad termina con f1 
         0xf1,0xde,0xbc,0x9a,0x78,0x56,0x34,0x12, 
         0xf0,0xde,0xbc,0x9a,0x78,0x56,0x34,0x12),
         BT_GATT_CHRC_NOTIFY,
         BT_GATT_PERM_NONE,
-        NULL, NULL, &value),
+        NULL, NULL, &value), */
         
-    BT_GATT_CCC(button_ccc_cfg_changed,
-                BT_GATT_PERM_READ | BT_GATT_PERM_WRITE)
+        BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(
+        // Este UUID es ligeramente distinto, en lugar de f0 comienza con f1
+        // Recuerda que esta espejeado, asi que en realidad termina con f1 
+        0xf1,0xde,0xbc,0x9a,0x78,0x56,0x34,0x12, 
+        0xf0,0xde,0xbc,0x9a,0x78,0x56,0x34,0x12),
+        BT_GATT_CHRC_READ,
+        BT_GATT_PERM_READ,
+        read_button_value, NULL, &value) //llamada al callback read_button_value
+        
+   /* BT_GATT_CCC(button_ccc_cfg_changed,
+                BT_GATT_PERM_READ | BT_GATT_PERM_WRITE) */
 );
 
 // Funciones (callbacks) de la conexion, ¿donde se estan llamando?
@@ -114,6 +132,7 @@ BT_CONN_CB_DEFINE(conn_callbacks) = {
     .disconnected = disconnected,
 };
 
+
 // ISR del buton A
 static void button_pressed(const struct device *dev, struct gpio_callback *cb,
                              uint32_t pins)
@@ -121,12 +140,12 @@ static void button_pressed(const struct device *dev, struct gpio_callback *cb,
     value++;
     LOG_INF("Boton A presionado %d veces.", value);
 
-    // Avisar al telefono que hubo un cambio
+   /* // Avisar al telefono que hubo un cambio
     if (current_conn) {
         bt_gatt_notify(current_conn, &button_svc.attrs[2], &value, sizeof(value));
     } else {
         LOG_INF("No hay cliente que reciba");
-    }
+    } */
 }
 
 // Programa Principal
